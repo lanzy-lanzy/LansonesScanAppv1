@@ -45,6 +45,7 @@ fun ModeDescription(
         val description = when (targetMode) {
             ScanMode.FRUIT -> "Analyze fruit ripeness and quality"
             ScanMode.LEAF -> "Detect leaf diseases and health"
+            ScanMode.UNKNOWN -> "General analysis"
         }
         
         Text(

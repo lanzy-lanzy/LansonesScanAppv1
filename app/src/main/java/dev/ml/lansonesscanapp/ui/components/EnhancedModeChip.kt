@@ -108,11 +108,13 @@ fun EnhancedModeChip(
     val icon = when (mode) {
         ScanMode.FRUIT -> Icons.Default.Restaurant
         ScanMode.LEAF -> Icons.Default.Eco
+        ScanMode.UNKNOWN -> Icons.Default.Restaurant // Default icon for unknown
     }
     
     val label = when (mode) {
         ScanMode.FRUIT -> "Fruit"
         ScanMode.LEAF -> "Leaf"
+        ScanMode.UNKNOWN -> "Unknown"
     }
     
     FilterChip(

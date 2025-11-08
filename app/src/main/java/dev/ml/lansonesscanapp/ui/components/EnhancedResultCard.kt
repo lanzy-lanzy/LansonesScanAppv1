@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Card
@@ -34,6 +36,7 @@ import dev.ml.lansonesscanapp.model.ScanResult
  * - Dividers for content separation
  * - Proper spacing (24dp padding)
  * - Line height set to 1.6x for better readability
+ * - Scrollable description content for long text
  * 
  * @param result The scan result to display
  * @param modifier Modifier to be applied to the card
@@ -56,12 +59,13 @@ fun EnhancedResultCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp) // MD3: Large padding for content cards
         ) {
-            // Title with icon badge
+            // Title with icon badge (fixed at top)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 16.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
@@ -79,24 +83,31 @@ fun EnhancedResultCard(
                 )
             }
             
-            Spacer(modifier = Modifier.height(16.dp)) // MD3: Medium spacing
-            
             // Divider for visual separation
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                thickness = 1.dp // MD3: Standard divider thickness
+                thickness = 1.dp, // MD3: Standard divider thickness
+                modifier = Modifier.padding(horizontal = 24.dp)
             )
             
             Spacer(modifier = Modifier.height(16.dp)) // MD3: Medium spacing
             
-            // Description with improved line height
-            Text(
-                text = result.description,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight.times(1.6f)
-                ),
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
+            // Scrollable description content
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
+            ) {
+                Text(
+                    text = result.description,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        lineHeight = MaterialTheme.typography.bodyLarge.lineHeight.times(1.6f)
+                    ),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
         }
     }
 }

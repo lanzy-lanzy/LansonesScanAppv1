@@ -95,6 +95,18 @@ class AnalysisViewModel(context: Context) : ViewModel() {
         // Now we receive formatted text instead of JSON
         if (response.isBlank()) return null
         
+        // Check if the response indicates an invalid image
+        if (response.startsWith("INVALID_IMAGE:")) {
+            val errorMessage = response.removePrefix("INVALID_IMAGE:").trim()
+            return ScanResult(
+                id = UUID.randomUUID().toString(),
+                mode = ScanMode.UNKNOWN,  // Set mode to UNKNOWN for invalid images
+                imageUri = uri.toString(),
+                title = "Unknown",
+                description = errorMessage
+            )
+        }
+        
         return when (mode) {
             ScanMode.FRUIT -> {
                 ScanResult(
@@ -111,6 +123,16 @@ class AnalysisViewModel(context: Context) : ViewModel() {
                     mode = mode,
                     imageUri = uri.toString(),
                     title = "Leaf Disease Analysis",
+                    description = response
+                )
+            }
+            ScanMode.UNKNOWN -> {
+                // This shouldn't happen in normal flow, but handle it just in case
+                ScanResult(
+                    id = UUID.randomUUID().toString(),
+                    mode = mode,
+                    imageUri = uri.toString(),
+                    title = "Unknown",
                     description = response
                 )
             }

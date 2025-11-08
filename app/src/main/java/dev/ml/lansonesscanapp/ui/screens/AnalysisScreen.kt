@@ -181,6 +181,7 @@ fun AnalysisScreen(
                     text = when (mode) {
                         ScanMode.FRUIT -> "Analyze fruit ripeness and quality"
                         ScanMode.LEAF -> "Detect leaf diseases and health"
+                        ScanMode.UNKNOWN -> "General analysis"
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -48,6 +48,9 @@ class GeminiClient(private val context: Context) {
             val prompt = when (mode) {
                 ScanMode.FRUIT -> getFruitPrompt()
                 ScanMode.LEAF -> getLeafPrompt()
+                ScanMode.UNKNOWN -> return@withContext Result.failure(
+                    Exception("Cannot analyze with UNKNOWN mode")
+                )
             }
             
             // Create content with image and prompt
@@ -123,7 +126,10 @@ class GeminiClient(private val context: Context) {
         return """
             You are a tropical fruit expert specializing in lansones (lanzones) fruit identification.
             
-            Analyze the uploaded image of a lansones fruit and provide a detailed, formal analysis.
+            IMPORTANT: First, verify that the image shows a lansones (lanzones) fruit. If the image does NOT show a lansones fruit (for example, if it shows a leaf, a different fruit, or any other object), you MUST respond with EXACTLY this text:
+            "INVALID_IMAGE: Please select image that is fruit of a lansones"
+            
+            If the image IS a lansones fruit, then analyze it and provide a detailed, formal analysis.
             
             Please structure your response in the following format without using asterisks or special formatting:
             
@@ -147,7 +153,10 @@ class GeminiClient(private val context: Context) {
         return """
             You are a plant pathologist specializing in tropical crops, particularly lansones (lanzones) trees.
             
-            Analyze the uploaded image of a lansones leaf and provide a comprehensive diagnostic report.
+            IMPORTANT: First, verify that the image shows a lansones (lanzones) leaf. If the image does NOT show a lansones leaf (for example, if it shows a fruit, a different plant, or any other object), you MUST respond with EXACTLY this text:
+            "INVALID_IMAGE: Please select image that is leaf of a lansones"
+            
+            If the image IS a lansones leaf, then analyze it and provide a comprehensive diagnostic report.
             
             Please structure your response in the following format without using asterisks or special formatting:
             
