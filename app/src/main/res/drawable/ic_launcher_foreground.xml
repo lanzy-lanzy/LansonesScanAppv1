@@ -1,0 +1,51 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Lansones Leaf Icon -->
+    <group
+        android:scaleX="0.8"
+        android:scaleY="0.8"
+        android:translateX="54"
+        android:translateY="54">
+        
+        <!-- Leaf shape -->
+        <path
+            android:fillColor="#FFFD8F"
+            android:pathData="M0,-30 Q15,-30 20,-20 Q25,-10 25,0 Q25,10 20,20 Q15,30 0,30 Q-15,30 -20,20 Q-25,10 -25,0 Q-25,-10 -20,-20 Q-15,-30 0,-30 Z"/>
+        
+        <!-- Leaf vein -->
+        <path
+            android:strokeColor="#B0CE88"
+            android:strokeWidth="2"
+            android:pathData="M0,-25 L0,25"/>
+        
+        <!-- Side veins -->
+        <path
+            android:strokeColor="#B0CE88"
+            android:strokeWidth="1.5"
+            android:pathData="M0,-15 Q8,-10 12,-5"/>
+        <path
+            android:strokeColor="#B0CE88"
+            android:strokeWidth="1.5"
+            android:pathData="M0,-15 Q-8,-10 -12,-5"/>
+        <path
+            android:strokeColor="#B0CE88"
+            android:strokeWidth="1.5"
+            android:pathData="M0,0 Q10,3 15,8"/>
+        <path
+            android:strokeColor="#B0CE88"
+            android:strokeWidth="1.5"
+            android:pathData="M0,0 Q-10,3 -15,8"/>
+        <path
+            android:strokeColor="#B0CE88"
+            android:strokeWidth="1.5"
+            android:pathData="M0,15 Q8,18 10,22"/>
+        <path
+            android:strokeColor="#B0CE88"
+            android:strokeWidth="1.5"
+            android:pathData="M0,15 Q-8,18 -10,22"/>
+    </group>
+</vector>
