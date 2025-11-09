@@ -8,6 +8,7 @@ import android.util.Log
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import dev.ml.lansonesscanapp.BuildConfig
+import dev.ml.lansonesscanapp.cache.AnalysisCache
 import dev.ml.lansonesscanapp.model.FruitAnalysisResult
 import dev.ml.lansonesscanapp.model.LeafAnalysisResult
 import dev.ml.lansonesscanapp.model.ScanMode
@@ -17,7 +18,7 @@ import kotlinx.serialization.json.Json
 import java.io.InputStream
 
 /**
- * Client for interacting with Google Gemini API
+ * Client for interacting with Google Gemini API with caching support
  */
 class GeminiClient(private val context: Context) {
     
@@ -35,14 +36,42 @@ class GeminiClient(private val context: Context) {
         apiKey = BuildConfig.GEMINI_API_KEY
     )
     
+    private val cache = AnalysisCache(context)
+    
     /**
-     * Analyzes an image based on the scan mode
+     * Analyzes an image based on the scan mode with caching support
      */
     suspend fun analyzeImage(imageUri: Uri, mode: ScanMode): Result<String> = withContext(Dispatchers.IO) {
+        var originalBitmap: Bitmap? = null
+        var resizedBitmap: Bitmap? = null
+        
         try {
             // Load bitmap from URI
-            val bitmap = loadBitmapFromUri(imageUri)
+            originalBitmap = loadBitmapFromUri(imageUri)
                 ?: return@withContext Result.failure(Exception("Failed to load image"))
+            
+            // Resize image FIRST to avoid memory issues
+            resizedBitmap = resizeBitmap(originalBitmap, 1024)
+            
+            // Recycle original if different from resized
+            if (originalBitmap != resizedBitmap) {
+                originalBitmap.recycle()
+                originalBitmap = null
+            }
+            
+            // Generate hash from resized bitmap (more memory efficient)
+            val imageHash = cache.generateImageHash(resizedBitmap)
+            Log.d(TAG, "Image hash: $imageHash")
+            
+            // Check cache first
+            val cachedResult = cache.getCachedResult(imageHash, mode)
+            if (cachedResult != null) {
+                Log.d(TAG, "Cache hit! Returning cached result")
+                resizedBitmap?.recycle()
+                return@withContext Result.success(cachedResult.result)
+            }
+            
+            Log.d(TAG, "Cache miss. Calling API...")
             
             // Get appropriate prompt
             val prompt = when (mode) {
@@ -55,7 +84,7 @@ class GeminiClient(private val context: Context) {
             
             // Create content with image and prompt
             val inputContent = content {
-                image(bitmap)
+                image(resizedBitmap)
                 text(prompt)
             }
             
@@ -70,8 +99,37 @@ class GeminiClient(private val context: Context) {
             
             Log.d(TAG, "Cleaned JSON response: $cleanedResponse")
             
+            // Cache the result for future use
+            cache.cacheResult(imageHash, mode, cleanedResponse)
+            Log.d(TAG, "Result cached successfully")
+            
+            // Clean up bitmap
+            resizedBitmap?.recycle()
+            
             Result.success(cleanedResponse)
+        } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "Out of memory error", e)
+            // Clean up bitmaps
+            originalBitmap?.recycle()
+            resizedBitmap?.recycle()
+            Result.failure(Exception("Image too large. Please try a smaller image or use gallery instead of camera."))
+        } catch (e: com.google.ai.client.generativeai.type.GoogleGenerativeAIException) {
+            Log.e(TAG, "Gemini API error: ${e.message}", e)
+            // Clean up bitmaps
+            originalBitmap?.recycle()
+            resizedBitmap?.recycle()
+            val errorMessage = when {
+                e.message?.contains("API key") == true -> "Invalid API key. Please check your Gemini API key."
+                e.message?.contains("quota") == true -> "API quota exceeded. Please try again later."
+                e.message?.contains("400") == true -> "Invalid request. The model may not support this operation."
+                else -> "API error: ${e.message}"
+            }
+            Result.failure(Exception(errorMessage, e))
         } catch (e: Exception) {
+            Log.e(TAG, "Analysis failed: ${e.message}", e)
+            // Clean up bitmaps
+            originalBitmap?.recycle()
+            resizedBitmap?.recycle()
             Result.failure(e)
         }
     }
@@ -111,6 +169,35 @@ class GeminiClient(private val context: Context) {
         }
     }
     
+    /**
+     * Resize bitmap to fit within maxSize while maintaining aspect ratio
+     * Smaller images = faster API response
+     */
+    private fun resizeBitmap(bitmap: Bitmap, maxSize: Int): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        
+        // If image is already small enough, return as-is
+        if (width <= maxSize && height <= maxSize) {
+            return bitmap
+        }
+        
+        // Calculate new dimensions maintaining aspect ratio
+        val ratio = width.toFloat() / height.toFloat()
+        val newWidth: Int
+        val newHeight: Int
+        
+        if (width > height) {
+            newWidth = maxSize
+            newHeight = (maxSize / ratio).toInt()
+        } else {
+            newHeight = maxSize
+            newWidth = (maxSize * ratio).toInt()
+        }
+        
+        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+    }
+    
     private fun cleanJsonResponse(response: String): String {
         // Remove markdown code blocks if present
         var cleaned = response.trim()
@@ -124,61 +211,45 @@ class GeminiClient(private val context: Context) {
     
     private fun getFruitPrompt(): String {
         return """
-            You are a tropical fruit expert specializing in lansones (lanzones) fruit identification.
+            You are a lansones fruit expert. Analyze this image quickly and concisely.
             
-            IMPORTANT: First, verify that the image shows a lansones (lanzones) fruit. If the image does NOT show a lansones fruit (for example, if it shows a leaf, a different fruit, or any other object), you MUST respond with EXACTLY this text:
+            CRITICAL: If this is NOT a lansones fruit, respond ONLY with:
             "INVALID_IMAGE: Please select image that is fruit of a lansones"
             
-            If the image IS a lansones fruit, then analyze it and provide a detailed, formal analysis.
+            If it IS a lansones fruit, provide a brief analysis:
             
-            Please structure your response in the following format without using asterisks or special formatting:
+            VARIETY: Identify variety (Lonkong, Duco, Paete, or Unknown) with confidence %.
             
-            VARIETY IDENTIFICATION
-            Identify the variety (Lonkong, Duco, Paete, or Unknown) and provide your confidence level as a percentage.
+            RIPENESS: State if unripe, ripe, overripe, or damaged with key visual indicators.
             
-            RIPENESS ASSESSMENT
-            Classify the ripeness as unripe, ripe, overripe, or damaged. Explain the visual indicators.
+            QUALITY: Note any defects (bruising, insect damage, discoloration).
             
-            QUALITY ASSESSMENT
-            List any visible defects such as bruising, insect holes, discoloration, or other issues.
+            RECOMMENDATIONS: Brief handling, storage, or consumption advice.
             
-            RECOMMENDATIONS
-            Provide suggestions for handling, storage, or consumption based on the fruit's condition.
-            
-            Write in clear, formal language suitable for farmers and agricultural professionals. Avoid using asterisks, bullet points, or markdown formatting. Use numbered lists or paragraph format instead.
+            Keep response concise and clear. No asterisks or markdown formatting.
         """.trimIndent()
     }
     
     private fun getLeafPrompt(): String {
         return """
-            You are a plant pathologist specializing in tropical crops, particularly lansones (lanzones) trees.
+            You are a lansones plant pathologist. Analyze this leaf quickly and concisely.
             
-            IMPORTANT: First, verify that the image shows a lansones (lanzones) leaf. If the image does NOT show a lansones leaf (for example, if it shows a fruit, a different plant, or any other object), you MUST respond with EXACTLY this text:
+            CRITICAL: If this is NOT a lansones leaf, respond ONLY with:
             "INVALID_IMAGE: Please select image that is leaf of a lansones"
             
-            If the image IS a lansones leaf, then analyze it and provide a comprehensive diagnostic report.
+            If it IS a lansones leaf, provide a brief diagnostic:
             
-            Please structure your response in the following format without using asterisks or special formatting:
+            DIAGNOSIS: Identify primary disease/condition with confidence %. Common issues: leaf spot, powdery mildew, anthracnose, bacterial blight, nutrient deficiency, pest infestation.
             
-            DISEASE DIAGNOSIS
-            Identify the primary disease or condition affecting this leaf. List all possible diagnoses with confidence levels. Common lansones diseases include leaf spot, powdery mildew, anthracnose, bacterial blight, and nutrient deficiencies.
+            SEVERITY: State low, moderate, or high with brief impact description.
             
-            SEVERITY ASSESSMENT
-            Classify the severity as low, moderate, or high. Describe the extent of damage and potential impact on the tree.
+            TREATMENT: Provide 2-3 key treatment steps (chemical and/or organic options).
             
-            TREATMENT RECOMMENDATIONS
-            Provide step-by-step treatment instructions. Include both chemical and organic options when applicable.
+            PRODUCTS: Suggest 1-2 specific product types (fungicides, pesticides, fertilizers).
             
-            RECOMMENDED PRODUCTS
-            Suggest specific types of products (fungicides, pesticides, fertilizers) with examples that farmers can use.
+            PREVENTION: List 2-3 key prevention practices.
             
-            PREVENTION MEASURES
-            Describe cultural practices and farming techniques to prevent recurrence of this condition.
-            
-            ADDITIONAL OBSERVATIONS
-            Note any other concerns or information that would be helpful for the farmer.
-            
-            Write in clear, formal language suitable for farmers and agricultural professionals. Avoid using asterisks, bullet points, or markdown formatting. Use numbered lists or paragraph format instead.
+            Keep response concise and actionable. No asterisks or markdown formatting.
         """.trimIndent()
     }
 }

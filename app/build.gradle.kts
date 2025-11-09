@@ -92,6 +92,9 @@ dependencies {
     // JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     
+    // DataStore for caching
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

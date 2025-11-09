@@ -24,6 +24,7 @@ class AnalysisViewModel(context: Context) : ViewModel() {
     private val database = AppDatabase.getDatabase(context)
     private val dao = database.scanResultDao()
     private val preferencesManager = PreferencesManager(context)
+    private val imageStorageManager = dev.ml.lansonesscanapp.utils.ImageStorageManager(context)
     
     private val _uiState = MutableStateFlow(AnalysisUiState())
     val uiState: StateFlow<AnalysisUiState> = _uiState.asStateFlow()
@@ -95,13 +96,20 @@ class AnalysisViewModel(context: Context) : ViewModel() {
         // Now we receive formatted text instead of JSON
         if (response.isBlank()) return null
         
+        // Generate unique ID for this scan
+        val scanId = UUID.randomUUID().toString()
+        
+        // Save image permanently to internal storage
+        val permanentUri = imageStorageManager.saveImagePermanently(uri, scanId)
+        val imageUriToStore = permanentUri?.toString() ?: uri.toString()
+        
         // Check if the response indicates an invalid image
         if (response.startsWith("INVALID_IMAGE:")) {
             val errorMessage = response.removePrefix("INVALID_IMAGE:").trim()
             return ScanResult(
-                id = UUID.randomUUID().toString(),
+                id = scanId,
                 mode = ScanMode.UNKNOWN,  // Set mode to UNKNOWN for invalid images
-                imageUri = uri.toString(),
+                imageUri = imageUriToStore,
                 title = "Unknown",
                 description = errorMessage
             )
@@ -110,18 +118,18 @@ class AnalysisViewModel(context: Context) : ViewModel() {
         return when (mode) {
             ScanMode.FRUIT -> {
                 ScanResult(
-                    id = UUID.randomUUID().toString(),
+                    id = scanId,
                     mode = mode,
-                    imageUri = uri.toString(),
+                    imageUri = imageUriToStore,
                     title = "Fruit Analysis Result",
                     description = response
                 )
             }
             ScanMode.LEAF -> {
                 ScanResult(
-                    id = UUID.randomUUID().toString(),
+                    id = scanId,
                     mode = mode,
-                    imageUri = uri.toString(),
+                    imageUri = imageUriToStore,
                     title = "Leaf Disease Analysis",
                     description = response
                 )
@@ -129,9 +137,9 @@ class AnalysisViewModel(context: Context) : ViewModel() {
             ScanMode.UNKNOWN -> {
                 // This shouldn't happen in normal flow, but handle it just in case
                 ScanResult(
-                    id = UUID.randomUUID().toString(),
+                    id = scanId,
                     mode = mode,
-                    imageUri = uri.toString(),
+                    imageUri = imageUriToStore,
                     title = "Unknown",
                     description = response
                 )
